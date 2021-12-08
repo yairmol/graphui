@@ -51,40 +51,26 @@ def grid_graph_layout(G: nx.Graph, w: int, h: int):
     return node_to_loc_map
 
 
-# class GraphView(QWidget):
-#     def __init__(self, w: int, h: int):
-#         self.label = QtWidgets.QLabel()
-#         self.canvas = QtGui.QPixmap(w, h)
-#         self.label.setPixmap(self.canvas)
-#         self.G: nx.Graph = nx.Graph()
-        
-#         self.r = 5
-#         self.painter = None
-#         self.eraser = None
+# class GraphViewState:
+#     def __init__(self) -> None:
+#         pass
 
-#         self.vertex_mapping = dict()
-#         self.moving_vertex = None
-#         self.mode: Mode = Mode.MOVE
-#         self.last_point = None
-#         self.selected_points = list()
-#         self.selected_vertices = set()
-#         self.get_non_edges = None
+class A():
+    def __init__(self, x, y) -> None:
+        self.x = x
+        self.y = y
+    
+
+class B(A):
+    def __init__(self, x, y) -> None:
+        super().__init__(x, y)
 
 
-class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self._main = QWidget()
-        self.grid = QGridLayout(self._main)
-        self.label = QtWidgets.QLabel()
-        self.canvas = QtGui.QPixmap(1200, 800)
-        self.label.setPixmap(self.canvas)
-        self.grid.addWidget(self.label, 0, 0)
-        self.setCentralWidget(self._main)
-        
-        # self.setCentralWidget(self.label)
-        self.init_buttons()
-
+class GraphView(QtWidgets.QLabel):
+    def __init__(self, w: int, h: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.canvas = QtGui.QPixmap(w, h)
+        self.setPixmap(self.canvas)
         self.G: nx.Graph = nx.Graph()
         
         self.r = 5
@@ -98,32 +84,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.selected_points = list()
         self.selected_vertices = set()
         self.get_non_edges = None
-        # print("layout", )
-    
-    def init_buttons(self):
-        buttons_widget = QWidget()
-        self.buttons = QVBoxLayout(buttons_widget)
-        self.grid.addWidget(buttons_widget, 0, 1)
-        button = QPushButton('Delete', self)
-        self.buttons.addWidget(button)
-        button2 = QPushButton('Move', self)
-        self.buttons.addWidget(button2)
-        button3 = QPushButton('Paint Vertices', self)
-        self.buttons.addWidget(button3)
-        button4 = QPushButton('Paint Edges', self)
-        self.buttons.addWidget(button4)
-        button5 = QPushButton('Select Vertices', self)
-        self.buttons.addWidget(button5)
-        # button.setToolTip('This is an example button')
-        # button.move(100,70)
-        button.clicked.connect(self.on_delete_click)
-        button2.clicked.connect(self.on_move_click)
-        button3.clicked.connect(self.on_paintv_click)
-        button4.clicked.connect(self.on_painte_click)
-        button5.clicked.connect(lambda: self.set_mode(Mode.SELECT))
     
     def init_painter(self, color: str = 'white', fill=True):
-        painter = QtGui.QPainter(self.label.pixmap())
+        painter = QtGui.QPainter(self.pixmap())
         pen = QtGui.QPen()
         pen.setColor(QtGui.QColor(color))
         painter.setPen(pen)
@@ -140,7 +103,6 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def draw_graph(self, G: nx.Graph):
         node_to_loc_map = grid_graph_layout(G, 700, 600)
-        print(type(G), G.nodes())
         for u in G.nodes():
             x, y = node_to_loc_map[u]
             self.draw_vertex(x, y)
@@ -196,7 +158,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update()
     
     def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
-        p = self.label.mapFromParent(a0.pos())
+        p = a0.pos()
         p = (p.x(), p.y())
         self.last_point = p
         match self.mode:
@@ -299,7 +261,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.last_point = cur_point
     
     def mouseMoveEvent(self, a0: QtGui.QMouseEvent) -> None:
-        p = self.label.mapFromParent(a0.pos())
+        p = a0.pos()
         match self.mode:
             case Mode.DELETE:
                 self.delete_intersecting_edges((p.x(), p.y()))
@@ -341,18 +303,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.delete_missing_edges()
         self.mode = mode
     
-    def on_delete_click(self):
-        self.set_mode(Mode.DELETE)
-    
-    def on_move_click(self):
-        self.set_mode(Mode.MOVE)
-    
-    def on_paintv_click(self):
-        self.set_mode(Mode.PAINT_VERTICES)
-    
-    def on_painte_click(self):
-        self.set_mode(Mode.PAINT_EDGES)
-    
     def draw_edge(self, u, v):
         """assume painter is initiated"""
         self.painter.drawLine(*self.vertex_mapping[u], *self.vertex_mapping[v])
@@ -371,6 +321,64 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.delete_edge(u, v)
         self.eraser.end()
         self.update()
+    
+
+
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self._main = QWidget()
+        self.grid = QGridLayout(self._main)
+        self.graph_view = GraphView(600, 400)
+        self.graph_view_2 = GraphView(600, 400)
+        self.graph_view_3 = GraphView(600, 400)
+        self.grid.addWidget(self.graph_view, 0, 0)
+        self.grid.addWidget(self.graph_view_2, 1, 0)
+        self.grid.addWidget(self.graph_view_3, 1, 1)
+        self.setCentralWidget(self._main)
+        
+        # self.setCentralWidget(self.label)
+        self.init_buttons()
+
+        # print("layout", )
+    
+    def init_buttons(self):
+        buttons_widget = QWidget()
+        self.buttons = QVBoxLayout(buttons_widget)
+        self.grid.addWidget(buttons_widget, 0, 1)
+        button = QPushButton('Delete', self)
+        self.buttons.addWidget(button)
+        button2 = QPushButton('Move', self)
+        self.buttons.addWidget(button2)
+        button3 = QPushButton('Paint Vertices', self)
+        self.buttons.addWidget(button3)
+        button4 = QPushButton('Paint Edges', self)
+        self.buttons.addWidget(button4)
+        button5 = QPushButton('Select Vertices', self)
+        self.buttons.addWidget(button5)
+        # button.setToolTip('This is an example button')
+        # button.move(100,70)
+        button.clicked.connect(self.on_delete_click)
+        button2.clicked.connect(self.on_move_click)
+        button3.clicked.connect(self.on_paintv_click)
+        button4.clicked.connect(self.on_painte_click)
+        button5.clicked.connect(lambda: self.graph_view.set_mode(Mode.SELECT))
+    
+    def set_mode(self, mode):
+        for gv in [self.graph_view, self.graph_view_2, self.graph_view_3]:
+            gv.set_mode(mode)
+    
+    def on_delete_click(self):
+        self.set_mode(Mode.DELETE)
+    
+    def on_move_click(self):
+        self.set_mode(Mode.MOVE)
+    
+    def on_paintv_click(self):
+        self.set_mode(Mode.PAINT_VERTICES)
+    
+    def on_painte_click(self):
+        self.set_mode(Mode.PAINT_EDGES)
 
 
 def main():
