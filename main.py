@@ -3,11 +3,13 @@ import sys
 from typing import Any, Dict, Optional, Tuple
 from PyQt5 import QtGui, QtWidgets  # , uic
 from PyQt5.QtCore import QPoint, QRect, Qt
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from time import sleep
 import networkx as nx
 import numpy as np
 from graph_view import Mode, GraphView
+from responsive_graph import ResponsiveGraph
+from tree_covers.pygraph.metric_spaces import tree_cover_embedding_distortion, tree_cover_bad_pairs
 # from graph_view2 import GraphView2 as GraphView
 
 
@@ -59,15 +61,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self._main = QWidget()
         self.grid = QGridLayout(self._main)
         self.graph_views_dim = 1200, 800
-        self.graph_views = [GraphView(*self.graph_views_dim)]  # , GraphView(*graph_views_dim)]
+        self.graph_views = [GraphView(*self.graph_views_dim, ResponsiveGraph())]  # , GraphView(*graph_views_dim)]
         self.gvwidget = QWidget()
         self.graph_views_widget = QGridLayout(self.gvwidget)
         self.num_rows, self.num_cols = 1, 1
         self.graph_views_widget.addWidget(self.graph_views[0])
         self.grid.addWidget(self.gvwidget, 0, 0)
         self.setCentralWidget(self._main)
+
+        self.calc_stretch = False
         # self.setCentralWidget(self.label)
         self.init_buttons()
+        self.bad_pairs = None
+        self.last_bad_pair = None
         # print("layout", )
     
     def init_buttons(self):
@@ -88,6 +94,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.buttons.addWidget(add_graph_view_button)
         drag_graph_view_button = QPushButton('Drag View', self)
         self.buttons.addWidget(drag_graph_view_button)
+        auto_stretch_calc_button = QPushButton('Auto Stretch Calculation', self)
+        self.buttons.addWidget(auto_stretch_calc_button)
+        duplicate_view_button = QPushButton('Duplicate Graph')
+        self.buttons.addWidget(duplicate_view_button)
+        display_next_button = QPushButton('Display next bad pair')
+        self.buttons.addWidget(display_next_button)
         # button.setToolTip('This is an example button')
         # button.move(100,70)
         delete_edges_button.clicked.connect(lambda: self.set_mode(Mode.DELETE))
@@ -96,11 +108,61 @@ class MainWindow(QtWidgets.QMainWindow):
         paint_edges_button.clicked.connect(lambda: self.set_mode(Mode.PAINT_EDGES))
         select_vertices_buttom.clicked.connect(lambda: self.set_mode(Mode.SELECT))
         drag_graph_view_button.clicked.connect(lambda: self.set_mode(Mode.DRAG))
+        auto_stretch_calc_button.clicked.connect(self.set_auto_stretch)
+        display_next_button.clicked.connect(self.display_next_bad_pair)
+        duplicate_view_button.clicked.connect(self.duplicate_view)
         add_graph_view_button.clicked.connect(self.add_graph_view)
     
     def set_mode(self, mode):
         for gv in self.graph_views:
             gv.set_mode(mode)
+    
+    def display_next_bad_pair(self):
+        if not self.bad_pairs:
+            print("no bad pairs")
+            return
+        try:
+            if self.last_bad_pair:
+                u, v = self.last_bad_pair
+                for gv in self.graph_views:
+                    p = nx.shortest_path(gv.G, u, v)
+                    gv.draw_edges(zip(p, p[1:]))
+                    gv.draw_vertices(p)
+
+            u, v = next(self.bad_pairs)
+            self.last_bad_pair = u, v
+            for gv in self.graph_views:
+                p = nx.shortest_path(gv.G, u, v)
+                red_pen = QtGui.QPen(QtGui.QColor('red'))
+                gv.draw_edges(zip(p, p[1:]), red_pen, None)
+                gv.draw_vertices(p, red_pen)
+        except:
+            print("out of bad pairs")
+            self.bad_pairs = None
+            self.last_bad_pair = None
+    
+    def set_auto_stretch(self):
+        if not self.calc_stretch:
+            stretch_label = QLabel()
+            stretch_label.setText("stretch: ")
+            stretch_label.setFont(QtGui.QFont('calibry', 12, 1, False))
+            self.buttons.addWidget(stretch_label)
+            if len(self.graph_views) <= 1:
+                return
+            self.calc_stretch = True
+
+            def calc_and_display_strecth_cb(*args):
+                dist = tree_cover_embedding_distortion(self.graph_views[0].G, [gv.G for gv in self.graph_views[1:]])
+                print(dist)
+                stretch_label.setText(f"stretch: {dist}")
+                self.bad_pairs = tree_cover_bad_pairs(self.graph_views[0].G, [gv.G for gv in self.graph_views[1:]], 2)
+                self.bad_pairs = list(self.bad_pairs)
+                print(self.bad_pairs)
+                self.bad_pairs = iter(self.bad_pairs)
+            
+            for gv in self.graph_views:
+                gv.G.register_on_edge_add_callback(calc_and_display_strecth_cb)
+                gv.G.register_on_edge_remove_callback(calc_and_display_strecth_cb)
     
     def add_graph_view0(self):
         for gv in self.graph_views:
@@ -118,7 +180,7 @@ class MainWindow(QtWidgets.QMainWindow):
             col = (col + 1) % num_cols
         self.update()
     
-    def add_graph_view(self):
+    def _add_graph_view(self, graph: ResponsiveGraph, mapping: Dict[Any, Tuple[int, int]]):
         old_w = self.graph_views_dim[0] // self.num_cols
         old_h = self.graph_views_dim[1] // self.num_rows
         ngraph_views = len(self.graph_views) + 1
@@ -147,7 +209,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             for gv in self.graph_views
         ]
-        self.graph_views.append(GraphView(w, h))
+        self.graph_views.append(GraphView(w, h, graph, rescale_origin_mapping(mapping, old_w, old_h, w, h)))
         
         row, col = 0, 0
         for gv in self.graph_views:
@@ -159,6 +221,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.grid.addWidget(self.gvwidget, 0, 0)
         self.update()
 
+    
+    def add_graph_view(self):
+        self._add_graph_view(ResponsiveGraph(), dict())
+    
+    def duplicate_view(self):
+        self._add_graph_view(self.graph_views[0].G.copy(), self.graph_views[0].vertex_mapping.copy())
+        
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
