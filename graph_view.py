@@ -13,20 +13,27 @@ from PyQt5.QtGui import (
     QBrush,
     QColor,
 )
-from shapely.geometry import LineString
-from itertools import combinations
-from shapely.geometry.multipoint import MultiPoint
-from shapely.geometry.point import Point
-from graph_view_state import DeleteEdgesState, DragViewState, GraphViewStateFactory, MoveVerticesState, PaintEdgesState, PaintVerticesState, SelectVerticesState
-
+from commandbar.keyinput.modeman import instance
+from graph_view_state import (
+    DeleteEdgesState,
+    DragViewState,
+    GraphViewStateFactory,
+    MoveVerticesState,
+    PaintEdgesState,
+    PaintVerticesState,
+    SelectVerticesState
+)
+from responsive_graph import ResponsiveGraph
+from commandbar.api import cmdutils
+from commandbar.utils import objreg
 
 class Mode(Enum):
-    MOVE = auto()
-    DELETE = auto()
-    PAINT_VERTICES = auto()
-    PAINT_EDGES = auto()
-    SELECT = auto()
-    DRAG = auto()
+    move_vertices = auto()
+    delete_edges = auto()
+    paint_vertices = auto()
+    paint_edges = auto()
+    select = auto()
+    drag = auto()
 
 
 class MyPainter(QPainter):
@@ -53,13 +60,17 @@ class GraphView(QLabel):
         w: int, h: int,
         G: Optional[nx.Graph] = None,
         vertex_mapping: Optional[Dict[Any, Tuple[int, int]]] = None,
+        win_id=None,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
+        self._win_id = win_id
+        objreg.register('graph-view', self, scope='window', window=self._win_id)
         self.setMinimumSize(1, 1)
 
-        self.G = G or nx.Graph()
+        self.G = G or ResponsiveGraph()
         self.vertex_mapping = vertex_mapping or dict()
+        self.float_vertex_mapping = self.vertex_mapping.copy()
         self.state_factory = GraphViewStateFactory()
         self.state = self.state_factory.initial_state(self)
 
@@ -80,7 +91,15 @@ class GraphView(QLabel):
 
         self.base_zoom_factor = 1.1
 
+        self.base_x = None
+        self.base_y = None
+        self.clicked_button = 0
+
         self.clear_canvas()
+    
+    def set_vertex_loc(self, u, loc):
+        self.vertex_mapping[u] = loc
+        self.float_vertex_mapping[u] = loc
     
     def clear_canvas(self):
         with self.painter(self.black_pen, self.black_brush):
@@ -166,22 +185,42 @@ class GraphView(QLabel):
         self.delete_edges((u, v) for v in self.G[u])
 
     def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
-        self.state.on_mouse_press(a0)
+        self.clicked_button = a0.button()
+        if self.clicked_button == Qt.LeftButton:
+            self.state.on_mouse_press(a0)
+        elif self.clicked_button == Qt.RightButton:
+            self.base_x = a0.x()
+            self.base_y = a0.y()
     
     def mouseReleaseEvent(self, a0: QtGui.QMouseEvent) -> None:
+        self.clicked_button = 0
         self.state.on_mouse_release(a0)
     
     def mouseMoveEvent(self, a0: QtGui.QMouseEvent) -> None:
-        self.state.on_mouse_move(a0)
+        if self.clicked_button == Qt.RightButton:
+            self.clear_canvas()
+            dx = a0.x() - self.base_x
+            dy = a0.y() - self.base_y
+            self.base_x = a0.x()
+            self.base_y = a0.y()
+            for u, (x, y) in self.vertex_mapping.items():
+                self.vertex_mapping[u] = (x + dx, y + dy)
+            for u, (x, y) in self.float_vertex_mapping.items():
+                self.float_vertex_mapping[u] = (x + dx, y + dy)
+            self.draw_graph()
+        else:
+            self.state.on_mouse_move(a0)
     
     def zoom(self, rel_x, rel_y, factor):
         self.cummultive_r *= factor
         self.r = max(3, int(self.cummultive_r))
         self.clear_canvas()
-        for u, (x, y) in self.vertex_mapping.items():
+        for u, (x, y) in self.float_vertex_mapping.items():
             dx = x - rel_x
             dy = y - rel_y
-            self.vertex_mapping[u] = (rel_x + int(factor * dx), rel_y + int(factor * dy))
+            x, y = rel_x + factor * dx, rel_y + factor * dy
+            self.float_vertex_mapping[u] = (x, y)
+            self.vertex_mapping[u] = (int(x), int(y))
         self.draw_graph()
     
     def wheelEvent(self, a0: QtGui.QWheelEvent) -> None:
@@ -190,14 +229,21 @@ class GraphView(QLabel):
         factor = factor if steps > 0 else 1 / factor
         self.zoom(a0.x(), a0.y(), factor)
     
-    def set_mode(self, mode):
+    @cmdutils.register(name='paint-edges', instance='graph-view', scope='window')
+    def paint_edges(self):
+        self.set_mode(Mode.paint_edges)
+    
+    @cmdutils.register(name='set-gv-mode', instance='graph-view', scope='window')
+    def set_mode(self, mode: str):
+        mode = Mode[mode]
+        print(mode)
         mode_to_state = {
-            Mode.PAINT_VERTICES: PaintVerticesState,
-            Mode.PAINT_EDGES: PaintEdgesState,
-            Mode.SELECT: SelectVerticesState,
-            Mode.MOVE: MoveVerticesState,
-            Mode.DELETE: DeleteEdgesState,
-            Mode.DRAG: DragViewState,
+            Mode.paint_vertices: PaintVerticesState,
+            Mode.paint_edges: PaintEdgesState,
+            Mode.select: SelectVerticesState,
+            Mode.move_vertices: MoveVerticesState,
+            Mode.delete_edges: DeleteEdgesState,
+            Mode.drag: DragViewState,
         }
         new_state = mode_to_state[mode](self)
         self.state.transition_out(new_state)

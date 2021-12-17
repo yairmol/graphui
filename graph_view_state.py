@@ -42,7 +42,7 @@ class PaintVerticesState(GraphViewState):
     def on_mouse_press(self, e: QtGui.QMouseEvent):
         u = max(self.graph_view.G.nodes or [0]) + 1
         self.G.add_node(u)
-        self.vertex_mapping[u] = (e.x(), e.y())
+        self.graph_view.set_vertex_loc(u, (e.x(), e.y()))
         self.graph_view.draw_vertex(u)
 
 
@@ -115,7 +115,7 @@ class MoveVerticesState(GraphViewState):
         # self.graph_view.delete_vertex(u)
         # self.graph_view.delete_vertex_edges(u)
         self.graph_view.clear_canvas()
-        self.graph_view.vertex_mapping[u] = (x, y)
+        self.graph_view.set_vertex_loc(u, (x, y))
         self.graph_view.draw_graph()
         # self.graph_view.draw_vertex(u)
         # self.graph_view.draw_vertex_edges(u)

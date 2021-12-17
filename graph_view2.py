@@ -27,7 +27,7 @@ class GraphView2(QtWidgets.QLabel):
         self.gray_pen = QPen(QColor('gray'))
 
         self.vertex_mapping = dict()
-        self.mode = Mode.PAINT_VERTICES
+        self.mode = Mode.paint_vertices
         self.clear_canvas()
     
     def draw_vertex(self, u):
@@ -50,13 +50,13 @@ class GraphView2(QtWidgets.QLabel):
             return None
     
     def mousePressEvent(self, e: QtGui.QMouseEvent) -> None:
-        if self.mode == Mode.PAINT_VERTICES:
+        if self.mode == Mode.paint_vertices:
             u = max(self.G.nodes or [-1]) + 1
             self.G.add_node(u)
             self.vertex_mapping[u] = (e.x(), e.y())
             self.draw_vertex(u)
             self.update()
-        elif self.mode == Mode.DELETE:
+        elif self.mode == Mode.delete_edges:
             u = self.in_vertex(e.x(), e.y())
             if u is not None:
                 self.delete_vertex(u)
@@ -69,5 +69,5 @@ class GraphView2(QtWidgets.QLabel):
         self.update()
     
     def set_mode(self, mode):
-        if mode in [Mode.PAINT_VERTICES, Mode.DELETE]:
+        if mode in [Mode.paint_vertices, Mode.delete_edges]:
             self.mode = mode

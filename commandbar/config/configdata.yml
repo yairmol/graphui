@@ -2541,12 +2541,12 @@ fonts.keyhint:
   desc: Font used in the keyhint widget.
 
 fonts.messages.error:
-  default: default_size default_family
+  default: default_size monospace
   type: Font
   desc: Font used for error messages.
 
 fonts.messages.info:
-  default: default_size default_family
+  default: default_size monospace
   type: Font
   desc: Font used for info messages.
 
@@ -2707,6 +2707,11 @@ bindings.default:
   no_autoconfig: true
   default:
     normal:
+      pe: set-gv-mode paint_edges
+      de: set-gv-mode delete_edges
+      pv: set-gv-mode paint_vertices
+      s: set-gv-mode select
+      mv: set-gv-mode move_vertices
       <Escape>: clear-keychain ;; search ;; fullscreen --leave
       o: set-cmd-text -s :open
       go: set-cmd-text :open {url:pretty}
@@ -2723,7 +2728,7 @@ bindings.default:
       <Ctrl-T>: open -t
       <Ctrl-N>: open -w
       <Ctrl-Shift-N>: open -p
-      d: tab-close
+      # d: tab-close
       <Ctrl-W>: tab-close
       <Ctrl-Shift-W>: close
       D: tab-close -o
@@ -2779,7 +2784,7 @@ bindings.default:
       n: search-next
       N: search-prev
       i: mode-enter insert
-      v: mode-enter caret
+      # v: mode-enter caret
       V: mode-enter caret ;; selection-toggle --line
       "`": mode-enter set_mark
       "'": mode-enter jump_mark
@@ -2799,7 +2804,7 @@ bindings.default:
       PP: open -t -- {primary}
       wp: open -w -- {clipboard}
       wP: open -w -- {primary}
-      m: quickmark-save
+      # m: quickmark-save
       b: set-cmd-text -s :quickmark-load
       B: set-cmd-text -s :quickmark-load -t
       wb: set-cmd-text -s :quickmark-load -w

@@ -12,6 +12,7 @@ from commandbar.utils import log
 
 from app import Application
 from mainwindow import MainWindow
+from commands.stretch import StretchCalcution
 
 
 def init_log(args):
@@ -176,8 +177,8 @@ def init(args):
     objects.qapp = app
     cmdhistory.init()
     eventfilter.init()
-    objects.qapp.focusChanged.connect(on_focus_changed)        
-
+    objects.qapp.focusChanged.connect(on_focus_changed)
+        
 
 def main():
     parser = get_argparser()

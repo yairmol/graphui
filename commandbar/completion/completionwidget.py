@@ -182,7 +182,7 @@ class CompletionView(QTreeView):
         Return:
             A QModelIndex.
         """
-        print("here")
+        # print("here")
         idx = self.selectionModel().currentIndex()
         if not idx.isValid():
             # No item selected yet

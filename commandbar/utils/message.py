@@ -57,6 +57,7 @@ def error(message: str, *, stack: str = None, replace: str = None) -> None:
     else:
         typ = 'error (from exception)'
     _log_stack(typ, stack)
+    print("error:", message)
     log.message.error(message)
     global_bridge.show(usertypes.MessageLevel.error, message, replace)
 
