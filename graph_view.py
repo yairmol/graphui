@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Iterable, Optional, Dict, Any, Tuple
 
 from PyQt5.QtCore import Qt, QPoint
-from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLabel, QSizePolicy
 from PyQt5 import QtGui
 from PyQt5.QtGui import (
     QPixmap, 
@@ -56,6 +56,7 @@ class GraphView(QLabel):
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
+        self.setMinimumSize(1, 1)
 
         self.G = G or nx.Graph()
         self.vertex_mapping = vertex_mapping or dict()
@@ -220,3 +221,10 @@ class GraphView(QLabel):
         #     self.delete_missing_edges()
         # self.mode = mode
     
+    def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
+        # print(a0.size())
+        self.painter.end()
+        self.setPixmap(self.pixmap().scaled(a0.size()))
+        self.painter = MyPainter(self.pixmap())
+        self.clear_canvas()
+        self.draw_graph()
