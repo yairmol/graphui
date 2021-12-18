@@ -4,12 +4,14 @@ import functools
 from typing import Any, Dict, MutableSequence, Tuple
 
 from PyQt5 import QtWidgets  # , uic
-from PyQt5.QtCore import QPoint, QRect, QTimer, pyqtBoundSignal
+from PyQt5.QtCore import QPoint, QRect, QSize, QTimer, pyqtBoundSignal
 from PyQt5.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QVBoxLayout, QWidget, QLabel
 from PyQt5 import QtGui
 import networkx as nx
+from commandbar.api import cmdutils
+from commandbar.commands.cmdexc import ArgumentTypeError
 
-from graph_view import Mode, GraphView
+from graph_view import Mode, GraphView, rescale_origin_mapping
 from tree_covers.pygraph.metric_spaces import (
     tree_cover_embedding_distortion,
     tree_cover_bad_pairs
@@ -26,29 +28,6 @@ from commandbar.utils import message
 import messageview
 
 _OverlayInfoType = Tuple[QWidget, pyqtBoundSignal, bool, str]
-
-
-def rescale_mapping(
-    mapping: Dict[Any, Tuple[int, int]],
-    old_rx: Tuple[int, int],
-    old_ry: Tuple[int, int],
-    new_rx: Tuple[int, int],
-    new_ry: Tuple[int, int]
-):
-    return {
-        u: (int(normalise(x, old_rx, new_rx)), int(normalise(y, old_ry, new_ry)))
-        for u, (x, y) in mapping.items()
-    }
-
-
-def rescale_origin_mapping(mapping: Dict[Any, Tuple[int, int]], old_w, old_h, w, h):
-    return rescale_mapping(mapping, (0, old_w), (0, old_h), (0, w), (0, h))
-
-
-def normalise(p: float, r1: Tuple[float, float], r2: Tuple[float, float]):
-    a, b = r1
-    c, d = r2
-    return c + ((p - a) * ((d - c) / (b - a)))
 
 
 def grid_graph_layout(G: nx.Graph, w: int, h: int):    
@@ -127,17 +106,24 @@ class MainWindow(QWidget):
         objreg.window_registry[self.win_id] = self
         objreg.register('main-window', self, scope='window',
                         window=self.win_id)
+        gv_registry = objreg.ObjectRegistry()
+        objreg.register('gv-registry', gv_registry, scope='window', window=self.win_id)
         # self._main = QWidget()
         # self.grid = QGridLayout(self._main)
         self.graph_views_dim = 800, 600
-        self.graph_views = [GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
-        # self.gvwidget = QWidget()
-        # self.graph_views_widget = QGridLayout(self.gvwidget)
-        # self.num_rows, self.num_cols = 1, 1
-        # self.graph_views_widget.addWidget(self.graph_views[0])
+        self.graph_views = [GraphView(*self.graph_views_dim, win_id=self.win_id), GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
+        objreg.register('graph-view', self.graph_views[0], scope='window', window=self.win_id)
+        self.gvwidget = QWidget()
+        self.graph_views_grid = QGridLayout(self.gvwidget)
+        self.num_rows, self.num_cols = 1, 1
+        self.graph_views_grid.addWidget(self.graph_views[0])
+        self.graph_views_grid.addWidget(self.graph_views[1], 0, 1)
+        self.graph_views_grid.setContentsMargins(0, 0, 0, 0)
+        self.graph_views_grid.setSpacing(1)
         # self.grid.addWidget(self.gvwidget, 0, 0)
-        # self._vbox.addWidget(self.gvwidget)
-        self._vbox.addWidget(self.graph_views[0])
+        self._vbox.addWidget(self.gvwidget)
+        # self._vbox.addWidget(self.graph_views[0])
+        # self._vbox.addWidget(self.graph_views[1])
         # self.setCentralWidget(self._main)
         self._init_geometry(None)
         # self.grid.addWidget(self.status, 1, 0)
@@ -228,6 +214,11 @@ class MainWindow(QWidget):
                 functools.partial(self._update_overlay_geometry, widget,
                                   centered, padding))
             self._update_overlay_geometry(widget, centered, padding)
+    
+    def restart_overlays(self):
+        for _, signal, _, _ in self._overlays:
+            signal.disconnect()
+        self._connect_overlay_signals()
     
     def _init_geometry(self, geometry):
         """Initialize the window geometry or load it from disk."""
@@ -395,7 +386,7 @@ class MainWindow(QWidget):
 
     def add_graph_view0(self):
         for gv in self.graph_views:
-            self.graph_views_widget.removeWidget(gv)
+            self.graph_views_grid.removeWidget(gv)
         graph_views_dim = 600, 400
         w, h = graph_views_dim
         num_cols = 2
@@ -404,7 +395,7 @@ class MainWindow(QWidget):
         self.graph_views.append(GraphView(w, h))
         for gv in self.graph_views:
             print(row, col)
-            self.graph_views_widget.addWidget(gv, row, col)
+            self.graph_views_grid.addWidget(gv, row, col)
             row += ((col + 1) // num_cols)
             col = (col + 1) % num_cols
         self.update()
@@ -421,37 +412,78 @@ class MainWindow(QWidget):
         
         w = self.graph_views_dim[0] // self.num_cols
         h = self.graph_views_dim[1] // self.num_rows
+        # n = len(self.graph_views)
+        # old_w, old_h = self.graph_views[0].width(), self.graph_views[0].height()
+        # print(old_w, old_h)
+
+        # h, w = old_h // (n + 1), old_w
 
         for gv in self.graph_views:
-            gv.painter.end()
-            self.graph_views_widget.removeWidget(gv)
+            self.graph_views_grid.removeWidget(gv)
         
-        self.grid.removeWidget(self.gvwidget)
+        for gv in self.graph_views:
+            gv.scale(QSize(w, h))
         
-        self.gvwidget = QWidget()
-        self.graph_views_widget = QGridLayout(self.gvwidget)
+        # self.grid.removeWidget(self.gvwidget)
+        
+        # self.gvwidget = QWidget()
+        # self.graph_views_widget = QGridLayout(self.gvwidget)
 
-        self.graph_views = [
-            GraphView(
-                w, h, gv.G,
-                rescale_origin_mapping(gv.vertex_mapping, old_w, old_h, w, h),
-            )
-            for gv in self.graph_views
-        ]
-        self.graph_views.append(GraphView(w, h, graph, rescale_origin_mapping(mapping, old_w, old_h, w, h)))
+        # self.graph_views = [
+        #     GraphView(
+        #         w, h, gv.G,
+        #         rescale_origin_mapping(gv.vertex_mapping, old_w, old_h, w, h),
+        #     )
+        #     for gv in self.graph_views
+        # ]
+        self.graph_views.append(GraphView(
+            w, h, graph, rescale_origin_mapping(mapping, old_w, old_h, w, h),
+            win_id=self.win_id
+        ))
         
         row, col = 0, 0
         for gv in self.graph_views:
-            self.graph_views_widget.addWidget(gv, row, col)
+            self.graph_views_grid.addWidget(gv, row, col)
             gv.draw_graph()
             row += ((col + 1) // self.num_cols)
             col = (col + 1) % self.num_cols
 
-        self.grid.addWidget(self.gvwidget, 0, 0)
-        self.update()
+        # self.grid.addWidget(self.gvwidget, 0, 0)
+        # self._vbox.removeWidget(self.status)
+        # self.graph_views[-1].stackUnder(self._completion)
+        # self.graph_views[-1].stackUnder(self._messageview)
+        # self._vbox.addWidget(self.graph_views[-1])
+        # self._vbox.addWidget(self.status)
+        
+        # self.restart_overlays()
+        # self._update_overlay_geometries()
 
     def add_graph_view(self):
         self._add_graph_view(ResponsiveGraph(), dict())
     
-    def duplicate_view(self):
-        self._add_graph_view(self.graph_views[0].G.copy(), self.graph_views[0].vertex_mapping.copy())
+    @cmdutils.register(name='duplicate', instance='main-window', scope='window')
+    def duplicate_view(self, gv_id: int = None):
+        """
+        Create another graph view which is identical to the current selected view
+        """
+        if gv_id is None:
+            gv: GraphView = objreg.get('graph-view', scope='window', window=self.win_id)
+            gv_id = gv.gv_id
+        if not isinstance(gv_id, int):
+            gv_id = int(gv_id)
+        try:
+            gv = [gv for gv in self.graph_views if gv.gv_id == gv_id][0]
+        except IndexError:
+            raise ArgumentTypeError(f"there is no graph-view with id {gv_id}")
+        self._add_graph_view(gv.G.copy(), gv.vertex_mapping.copy())
+    
+    @cmdutils.register(name='set-active-graph-view', instance='main-window', scope='window')
+    def set_active_graph_view(self, gv_idx: int):
+        """
+        Sets the current active graph view
+        """
+        if not isinstance(gv_idx, int):
+            gv_idx = int(gv_idx)
+        if len(self.graph_views) <= gv_idx:
+            raise ArgumentTypeError(f"graph-view id must be within range of nummber of graph views: {len(self.graph_views)}")
+        objreg.register('graph-view', self.graph_views[gv_idx], scope='window', window=self.win_id, update=True)

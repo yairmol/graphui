@@ -160,6 +160,28 @@ global_registry = ObjectRegistry()
 window_registry = ObjectRegistry()
 
 
+# def _get_graph_view_registy(win_id, gv_id=None, tab_id=None):
+#     """Get the registry of a graph view."""
+#     if gv_id == 'current' and win_id is None:
+#         window: Optional[QWidget] = QApplication.activeWindow()
+#         if window is None or not hasattr(window, 'win_id'):
+#             raise RegistryUnavailableError('tab')
+#         win_id = window.win_id
+#     elif win_id is None:
+#         raise TypeError("window is None with scope tab!")
+#     if gv_id == 'current':
+#         tabbed_browser = get('tabbed-browser', scope='window', window=win_id)
+#         tab = tabbed_browser.widget.currentWidget()
+#         if tab is None:
+#             raise RegistryUnavailableError('window')
+#         tab_id = tab.tab_id
+#     tab_registry = get('tab-registry', scope='window', window=win_id)
+#     try:
+#         return tab_registry[tab_id].registry
+#     except AttributeError:
+#         raise RegistryUnavailableError('tab')
+
+
 def _get_tab_registry(win_id: _WindowTab,
                       tab_id: _WindowTab) -> ObjectRegistry:
     """Get the registry of a tab."""

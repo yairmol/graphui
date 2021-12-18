@@ -12,7 +12,7 @@ from commandbar.utils import log
 
 from app import Application
 from mainwindow import MainWindow
-from commands.stretch import StretchCalcution
+from commands.stretch import calculate_stretch, StretchCalculator
 
 
 def init_log(args):

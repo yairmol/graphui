@@ -1,8 +1,9 @@
+import itertools
 import networkx as nx
 from enum import Enum, auto
 from typing import Iterable, Optional, Dict, Any, Tuple
 
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtCore import QSize, Qt, QPoint
 from PyQt5.QtWidgets import QLabel, QSizePolicy
 from PyQt5 import QtGui
 from PyQt5.QtGui import (
@@ -13,7 +14,6 @@ from PyQt5.QtGui import (
     QBrush,
     QColor,
 )
-from commandbar.keyinput.modeman import instance
 from graph_view_state import (
     DeleteEdgesState,
     DragViewState,
@@ -36,6 +36,29 @@ class Mode(Enum):
     drag = auto()
 
 
+def rescale_mapping(
+    mapping: Dict[Any, Tuple[int, int]],
+    old_rx: Tuple[int, int],
+    old_ry: Tuple[int, int],
+    new_rx: Tuple[int, int],
+    new_ry: Tuple[int, int]
+):
+    return {
+        u: (int(normalise(x, old_rx, new_rx)), int(normalise(y, old_ry, new_ry)))
+        for u, (x, y) in mapping.items()
+    }
+
+
+def rescale_origin_mapping(mapping: Dict[Any, Tuple[int, int]], old_w, old_h, w, h):
+    return rescale_mapping(mapping, (0, old_w), (0, old_h), (0, w), (0, h))
+
+
+def normalise(p: float, r1: Tuple[float, float], r2: Tuple[float, float]):
+    a, b = r1
+    c, d = r2
+    return c + ((p - a) * ((d - c) / (b - a)))
+
+
 class MyPainter(QPainter):
     def __init__(self, pd: QPaintDevice):
         super().__init__(pd)
@@ -54,6 +77,9 @@ class MyPainter(QPainter):
         pass
 
 
+graph_view_id_gen = itertools.count(0)
+
+
 class GraphView(QLabel):
     def __init__(
         self,
@@ -65,8 +91,12 @@ class GraphView(QLabel):
     ):
         super().__init__(*args, **kwargs)
         self._win_id = win_id
-        objreg.register('graph-view', self, scope='window', window=self._win_id)
-        self.setMinimumSize(1, 1)
+        self.gv_id = next(graph_view_id_gen)
+        
+        self.registry = objreg.ObjectRegistry()
+        gv_registry = objreg.get('gv-registry', scope='window', window=self._win_id)
+        gv_registry[self.gv_id] = self
+        objreg.register('graph-view', self, registry=self.registry)
 
         self.G = G or ResponsiveGraph()
         self.vertex_mapping = vertex_mapping or dict()
@@ -95,6 +125,7 @@ class GraphView(QLabel):
         self.base_y = None
         self.clicked_button = 0
 
+        self.setMinimumSize(1, 1)
         self.clear_canvas()
     
     def set_vertex_loc(self, u, loc):
@@ -229,10 +260,6 @@ class GraphView(QLabel):
         factor = factor if steps > 0 else 1 / factor
         self.zoom(a0.x(), a0.y(), factor)
     
-    @cmdutils.register(name='paint-edges', instance='graph-view', scope='window')
-    def paint_edges(self):
-        self.set_mode(Mode.paint_edges)
-    
     @cmdutils.register(name='set-gv-mode', instance='graph-view', scope='window')
     def set_mode(self, mode: str):
         mode = Mode[mode]
@@ -267,10 +294,17 @@ class GraphView(QLabel):
         #     self.delete_missing_edges()
         # self.mode = mode
     
-    def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
-        # print(a0.size())
+    def scale(self, size: QSize):
         self.painter.end()
-        self.setPixmap(self.pixmap().scaled(a0.size()))
+        old_w, old_h = self.pixmap().width(), self.pixmap().height()
+        self.setPixmap(self.pixmap().scaled(size))
+        w, h = size.width(), size.height()
+        self.vertex_mapping = rescale_origin_mapping(self.vertex_mapping, old_w, old_h, w, h)
+        self.float_vertex_mapping = self.vertex_mapping.copy()
         self.painter = MyPainter(self.pixmap())
         self.clear_canvas()
         self.draw_graph()
+    
+    def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
+        # print(a0.size())
+        self.scale(a0.size())
