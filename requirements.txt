@@ -1,0 +1,6 @@
+PyQt5
+networkx
+Jinja2
+scipy
+Shapely
+PyYAML

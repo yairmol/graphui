@@ -4,8 +4,8 @@ import networkx as nx
 from commandbar.api import cmdutils
 from commandbar.commands.cmdexc import PrerequisitesError
 from commandbar.utils import objreg
-from graph_view import GraphView
-from mainwindow import MainWindow
+from mainwindow.graph_view import GraphView
+from mainwindow.mainwindow import MainWindow
 from tree_covers.pygraph.metric_spaces import tree_cover_bad_pairs, tree_cover_embedding_distortion
 
 
