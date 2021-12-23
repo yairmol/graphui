@@ -7,7 +7,7 @@ from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, Qt
 
-import mainwindow
+import mainwindow.mainwindow as mainwindow
 from commandbar.config import qtargs
 from commandbar.utils import log
 from commandbar.misc import objects

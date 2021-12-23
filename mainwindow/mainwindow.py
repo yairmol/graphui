@@ -11,12 +11,12 @@ import networkx as nx
 from commandbar.api import cmdutils
 from commandbar.commands.cmdexc import ArgumentTypeError
 
-from graph_view import Mode, GraphView, rescale_origin_mapping
+from mainwindow.graph_view import Mode, GraphView, rescale_origin_mapping
 from tree_covers.pygraph.metric_spaces import (
     tree_cover_embedding_distortion,
     tree_cover_bad_pairs
 )
-from responsive_graph import ResponsiveGraph
+from graph.responsive_graph import ResponsiveGraph
 
 from commandbar.statusbar.bar import StatusBar
 from commandbar.utils import objreg, log, qtutils
@@ -25,7 +25,7 @@ from commandbar.commands import runners
 from commandbar.completion import completionwidget, completer
 from commandbar.config import configfiles, stylesheet, config
 from commandbar.utils import message
-import messageview
+import mainwindow.messageview as messageview
 
 _OverlayInfoType = Tuple[QWidget, pyqtBoundSignal, bool, str]
 
@@ -111,13 +111,12 @@ class MainWindow(QWidget):
         # self._main = QWidget()
         # self.grid = QGridLayout(self._main)
         self.graph_views_dim = 800, 600
-        self.graph_views = [GraphView(*self.graph_views_dim, win_id=self.win_id), GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
+        self.graph_views = [GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
         objreg.register('graph-view', self.graph_views[0], scope='window', window=self.win_id)
         self.gvwidget = QWidget()
         self.graph_views_grid = QGridLayout(self.gvwidget)
         self.num_rows, self.num_cols = 1, 1
         self.graph_views_grid.addWidget(self.graph_views[0])
-        self.graph_views_grid.addWidget(self.graph_views[1], 0, 1)
         self.graph_views_grid.setContentsMargins(0, 0, 0, 0)
         self.graph_views_grid.setSpacing(1)
         # self.grid.addWidget(self.gvwidget, 0, 0)
@@ -421,6 +420,8 @@ class MainWindow(QWidget):
         for gv in self.graph_views:
             self.graph_views_grid.removeWidget(gv)
         
+        self.graph_views.append(GraphView(old_w, old_h, graph, mapping, win_id=self.win_id))
+        
         for gv in self.graph_views:
             gv.scale(QSize(w, h))
         
@@ -436,10 +437,7 @@ class MainWindow(QWidget):
         #     )
         #     for gv in self.graph_views
         # ]
-        self.graph_views.append(GraphView(
-            w, h, graph, rescale_origin_mapping(mapping, old_w, old_h, w, h),
-            win_id=self.win_id
-        ))
+        
         
         row, col = 0, 0
         for gv in self.graph_views:

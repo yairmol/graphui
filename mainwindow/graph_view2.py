@@ -5,7 +5,7 @@ from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QPen, QBrush, QColor
 import networkx as nx
 
-from graph_view import Mode, MyPainter
+from mainwindow.graph_view import Mode, MyPainter
 
 class GraphView2(QtWidgets.QLabel):
     def __init__(self, w: int, h: int, *args, **kwargs):

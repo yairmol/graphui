@@ -14,7 +14,7 @@ from PyQt5.QtGui import (
     QBrush,
     QColor,
 )
-from graph_view_state import (
+from mainwindow.graph_view_state import (
     DeleteEdgesState,
     DragViewState,
     GraphViewStateFactory,
@@ -23,7 +23,7 @@ from graph_view_state import (
     PaintVerticesState,
     SelectVerticesState
 )
-from responsive_graph import ResponsiveGraph
+from graph.responsive_graph import ResponsiveGraph
 from commandbar.api import cmdutils
 from commandbar.utils import objreg
 

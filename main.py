@@ -11,9 +11,9 @@ from commandbar.misc import cmdhistory, objects
 from commandbar.utils import log
 
 from app import Application
-from mainwindow import MainWindow
+from mainwindow.mainwindow import MainWindow
 from commands.stretch import calculate_stretch, StretchCalculator
-
+from commands.algorithms import run_bfs
 
 def init_log(args):
     """Initialize logging.
