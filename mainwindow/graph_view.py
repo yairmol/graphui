@@ -21,7 +21,8 @@ from mainwindow.graph_view_state import (
     MoveVerticesState,
     PaintEdgesState,
     PaintVerticesState,
-    SelectVerticesState
+    SelectVerticesState,
+    GridState
 )
 from graph.responsive_graph import ResponsiveGraph
 from commandbar.api import cmdutils
@@ -34,6 +35,7 @@ class Mode(Enum):
     paint_edges = auto()
     select = auto()
     drag = auto()
+    grid = auto()
 
 
 def rescale_mapping(
@@ -127,6 +129,8 @@ class GraphView(QLabel):
 
         self.setMinimumSize(1, 1)
         self.clear_canvas()
+
+        self.m, self.n, self.spacing = 0, 0, 0
     
     def set_vertex_loc(self, u, loc):
         self.vertex_mapping[u] = loc
@@ -262,7 +266,8 @@ class GraphView(QLabel):
     
     @cmdutils.register(name='set-gv-mode', instance='graph-view', scope='window')
     def set_mode(self, mode: str):
-        mode = Mode[mode]
+        if not isinstance(mode, Mode):
+            mode = Mode[mode]
         print(mode)
         mode_to_state = {
             Mode.paint_vertices: PaintVerticesState,
@@ -271,28 +276,12 @@ class GraphView(QLabel):
             Mode.move_vertices: MoveVerticesState,
             Mode.delete_edges: DeleteEdgesState,
             Mode.drag: DragViewState,
+            Mode.grid: GridState,
         }
         new_state = mode_to_state[mode](self)
         self.state.transition_out(new_state)
         new_state.transition_in(self.state)
         self.state = new_state
-        # if self.mode == Mode.SELECT and self.selected_vertices:
-        #     self.unmark_vertices(self.selected_vertices)
-        #     if mode == Mode.PAINT_EDGES:
-        #         self.get_non_edges = lambda: filter(
-        #             lambda e: set(e).issubset(self.selected_vertices) and not self.G.has_edge(*e),
-        #             combinations(self.G.nodes, 2)
-        #         )
-        #         self.draw_missing_edges(self.get_non_edges())
-        # elif mode == Mode.PAINT_EDGES:
-        #     self.get_non_edges = lambda: filter(
-        #         lambda e: not self.G.has_edge(*e),
-        #         combinations(self.G.nodes, 2)
-        #     )
-        #     self.draw_missing_edges(self.get_non_edges())
-        # elif self.mode == Mode.PAINT_EDGES and mode != Mode.PAINT_EDGES:
-        #     self.delete_missing_edges()
-        # self.mode = mode
     
     def scale(self, size: QSize):
         self.painter.end()
@@ -308,3 +297,22 @@ class GraphView(QLabel):
     def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
         # print(a0.size())
         self.scale(a0.size())
+    
+    @cmdutils.register(name='draw-grid', instance='graph-view', scope='window')
+    def draw_grid(self, m: int, n: int, spacing: int = 10):
+        row_width = n * spacing
+        column_width = m * spacing
+        self.m, self.n, self.spacing = m, n, spacing
+        with self.painter(self.white_pen, self.white_brush):
+            for i in range(m + 1):
+                self.painter.drawLine(0, spacing * i, row_width, i * spacing)
+            for i in range(n + 1):
+                self.painter.drawLine(spacing * i, 0, i * spacing, column_width)
+        self.set_mode(Mode.grid)
+        self.update()
+    
+    def draw_filled_box(self, i, j):
+        print("drawing filling box")
+        with self.painter(self.white_pen, self.white_brush):
+            self.painter.drawRect(i * self.spacing, j * self.spacing, self.spacing, self.spacing)
+            self.update()

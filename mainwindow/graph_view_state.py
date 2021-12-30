@@ -1,3 +1,4 @@
+from PyQt5.QtCore import QPoint
 import numpy as np
 from itertools import combinations
 
@@ -217,6 +218,21 @@ class DragViewState(GraphViewState):
             self.vertex_mapping[u] = (x + dx, y + dy)
         self.graph_view.draw_graph()        
 
+
+class GridState(GraphViewState):
+    def __init__(self, graph_view) -> None:
+        super().__init__(graph_view)
+        self.spacing = graph_view.spacing
+        self.m = graph_view.m
+        self.n = graph_view.n
+    
+    def get_clicked_box(self, p: QPoint):
+        return p.x() // self.spacing, p.y() // self.spacing
+    
+    def on_mouse_press(self, e: QtGui.QMouseEvent):
+        i, j = self.get_clicked_box(e.pos())
+        print("box:", i, j)
+        self.graph_view.draw_filled_box(i, j)
 
 class GraphViewStateFactory:
     def initial_state(self, gv) -> GraphViewState:

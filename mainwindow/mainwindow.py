@@ -10,6 +10,7 @@ from PyQt5 import QtGui
 import networkx as nx
 from commandbar.api import cmdutils
 from commandbar.commands.cmdexc import ArgumentTypeError
+from mainwindow.canvas import Canvas
 
 from mainwindow.graph_view import Mode, GraphView, rescale_origin_mapping
 from tree_covers.pygraph.metric_spaces import (
@@ -111,7 +112,7 @@ class MainWindow(QWidget):
         # self._main = QWidget()
         # self.grid = QGridLayout(self._main)
         self.graph_views_dim = 800, 600
-        self.graph_views = [GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
+        self.graph_views = [Canvas(self.win_id, *self.graph_views_dim)]# [GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
         objreg.register('graph-view', self.graph_views[0], scope='window', window=self.win_id)
         self.gvwidget = QWidget()
         self.graph_views_grid = QGridLayout(self.gvwidget)
