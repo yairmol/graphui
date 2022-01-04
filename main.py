@@ -12,8 +12,9 @@ from commandbar.utils import log
 
 from app import Application
 from mainwindow.mainwindow import MainWindow
-from commands.stretch import calculate_stretch, StretchCalculator
-from commands.algorithms import run_bfs
+# from commands.stretch import calculate_stretch, StretchCalculator
+# from commands.algorithms import run_bfs
+from mainwindow.painters import annotate, graph_painter, grid_painter
 
 def init_log(args):
     """Initialize logging.
@@ -192,13 +193,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-# def force_atals_graph_layout(G: nx.Graph, w: int, h: int):
-#     positions = force_atlas2_layout(G, iterations=1000)
-#     r1 = (-10, 10)
-#     return {
-#         u: (int(normalise(x, r1, (20, w - 20))), int(normalise(y, r1, (20, h - 20))))
-#         for u, (x, y) in positions.items()
-#     }
