@@ -1,3 +1,4 @@
+from typing import Union
 from PyQt5 import QtCore, QtGui
 
 WHITE = QtGui.QColor('white')
@@ -15,3 +16,7 @@ BLUE_BRUSH = QtGui.QBrush(BLUE, QtCore.Qt.SolidPattern)
 GRAY = QtGui.QColor('gray')
 GRAY_PEN = QtGui.QPen(GRAY)
 GRAY_BRUSH = QtGui.QBrush(GRAY, QtCore.Qt.SolidPattern)
+
+def make_pen_and_brush(color: Union[str, int]):
+    qcolor = QtGui.QColor(color)
+    return QtGui.QPen(qcolor), QtGui.QBrush(qcolor, QtCore.Qt.SolidPattern)

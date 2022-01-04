@@ -1,23 +1,12 @@
 import base64
 import binascii
 import functools
-from typing import Any, Dict, MutableSequence, Tuple
+from typing import MutableSequence, Tuple
 
-from PyQt5 import QtWidgets  # , uic
-from PyQt5.QtCore import QPoint, QRect, QSize, QTimer, pyqtBoundSignal
-from PyQt5.QtWidgets import QGridLayout, QPushButton, QSizePolicy, QVBoxLayout, QWidget, QLabel
-from PyQt5 import QtGui
+from PyQt5.QtCore import QPoint, QRect, QTimer, pyqtBoundSignal
+from PyQt5.QtWidgets import QGridLayout, QSizePolicy, QVBoxLayout, QWidget
 import networkx as nx
-from commandbar.api import cmdutils
-from commandbar.commands.cmdexc import ArgumentTypeError
 from mainwindow.canvas import Canvas
-
-from mainwindow.graph_view import Mode, GraphView, rescale_origin_mapping
-from tree_covers.pygraph.metric_spaces import (
-    tree_cover_embedding_distortion,
-    tree_cover_bad_pairs
-)
-from graph.responsive_graph import ResponsiveGraph
 
 from commandbar.statusbar.bar import StatusBar
 from commandbar.utils import objreg, log, qtutils
@@ -100,36 +89,18 @@ class MainWindow(QWidget):
         super().__init__(parent)
         self.win_id = 0
         self._vbox = QVBoxLayout(self)
-        self._vbox.setContentsMargins(0, 0, 0, 0)
-        self._vbox.setSpacing(0)
         self._overlays: MutableSequence[_OverlayInfoType] = []
-        self.registry = objreg.ObjectRegistry()
-        objreg.window_registry[self.win_id] = self
-        objreg.register('main-window', self, scope='window',
-                        window=self.win_id)
-        gv_registry = objreg.ObjectRegistry()
-        objreg.register('gv-registry', gv_registry, scope='window', window=self.win_id)
-        # self._main = QWidget()
-        # self.grid = QGridLayout(self._main)
-        self.graph_views_dim = 800, 600
-        self.graph_views = [Canvas(self.win_id, *self.graph_views_dim)]# [GraphView(*self.graph_views_dim, win_id=self.win_id)]  # , GraphView(*graph_views_dim)]
-        objreg.register('graph-view', self.graph_views[0], scope='window', window=self.win_id)
-        self.gvwidget = QWidget()
-        self.graph_views_grid = QGridLayout(self.gvwidget)
-        self.num_rows, self.num_cols = 1, 1
-        self.graph_views_grid.addWidget(self.graph_views[0])
-        self.graph_views_grid.setContentsMargins(0, 0, 0, 0)
-        self.graph_views_grid.setSpacing(1)
-        # self.grid.addWidget(self.gvwidget, 0, 0)
-        self._vbox.addWidget(self.gvwidget)
-        # self._vbox.addWidget(self.graph_views[0])
-        # self._vbox.addWidget(self.graph_views[1])
-        # self.setCentralWidget(self._main)
+
+        self._init_registries()
+        
+        self.canvases = [Canvas(self.win_id, 800, 600)]
+        
+        objreg.register('graph-view', self.canvases[0], scope='window', window=self.win_id)
         self._init_geometry(None)
-        # self.grid.addWidget(self.status, 1, 0)
-                # self.setCentralWidget(self.label)
+        
         self.status = StatusBar(win_id=self.win_id, private=False)
-        self._vbox.addWidget(self.status)
+        
+        self._init_layout()
         self._init_completion()
 
         self._messageview = messageview.MessageView(parent=self)
@@ -140,13 +111,27 @@ class MainWindow(QWidget):
 
         self._commandrunner = runners.CommandRunner(self.win_id,
                                                     partial_match=True)
-        # self.init_buttons()
         self._connect_signals()
         QTimer.singleShot(0, self._connect_overlay_signals)
         stylesheet.set_register(self)
-        self.bad_pairs = None
-        self.last_bad_pair = None
-        # print("layout", )
+    
+    def _init_registries(self):
+        self.registry = objreg.ObjectRegistry()
+        objreg.window_registry[self.win_id] = self
+        objreg.register('main-window', self, scope='window',
+                        window=self.win_id)
+        objreg.register('canvas-registry', objreg.ObjectRegistry(), scope='window', window=self.win_id)
+    
+    def _init_layout(self):
+        self._vbox.setContentsMargins(0, 0, 0, 0)
+        self._vbox.setSpacing(0)
+        self.canvases_widget = QWidget()
+        self.canvases_grid = QGridLayout(self.canvases_widget)
+        self.canvases_grid.addWidget(self.canvases[0])
+        self.canvases_grid.setContentsMargins(0, 0, 0, 0)
+        self.canvases_grid.setSpacing(1)
+        self._vbox.addWidget(self.canvases_widget)
+        self._vbox.addWidget(self.status)
     
     def _add_overlay(self, widget, signal, *, centered=False, padding=0):
         self._overlays.append((widget, signal, centered, padding))
@@ -304,185 +289,3 @@ class MainWindow(QWidget):
             self._completion.on_clear_completion_selection)
         self.status.cmd.hide_completion.connect(
             self._completion.hide)
-    
-    def init_buttons(self):
-        buttons_widget = QWidget()
-        self.buttons = QVBoxLayout(buttons_widget)
-        self.grid.addWidget(buttons_widget, 0, 1)
-        delete_edges_button = QPushButton('Delete', self)
-        self.buttons.addWidget(delete_edges_button)
-        move_vertices_button = QPushButton('Move', self)
-        self.buttons.addWidget(move_vertices_button)
-        paint_vertices_button = QPushButton('Paint Vertices', self)
-        self.buttons.addWidget(paint_vertices_button)
-        paint_edges_button = QPushButton('Paint Edges', self)
-        self.buttons.addWidget(paint_edges_button)
-        select_vertices_buttom = QPushButton('Select Vertices', self)
-        self.buttons.addWidget(select_vertices_buttom)
-        add_graph_view_button = QPushButton('Add Graph View', self)
-        self.buttons.addWidget(add_graph_view_button)
-        drag_graph_view_button = QPushButton('Drag View', self)
-        self.buttons.addWidget(drag_graph_view_button)
-        # button.setToolTip('This is an example button')
-        # button.move(100,70)
-        delete_edges_button.clicked.connect(lambda: self.set_mode(Mode.delete_edges))
-        move_vertices_button.clicked.connect(lambda: self.set_mode(Mode.move_vertices))
-        paint_vertices_button.clicked.connect(lambda: self.set_mode(Mode.paint_vertices))
-        paint_edges_button.clicked.connect(lambda: self.set_mode(Mode.paint_edges))
-        select_vertices_buttom.clicked.connect(lambda: self.set_mode(Mode.select))
-        drag_graph_view_button.clicked.connect(lambda: self.set_mode(Mode.drag))
-        add_graph_view_button.clicked.connect(self.add_graph_view)
-    
-    def set_mode(self, mode):
-        for gv in self.graph_views:
-            gv.set_mode(mode)
-    
-    def display_next_bad_pair(self):
-        if not self.bad_pairs:
-            print("no bad pairs")
-            return
-        try:
-            if self.last_bad_pair:
-                u, v = self.last_bad_pair
-                for gv in self.graph_views:
-                    p = nx.shortest_path(gv.G, u, v)
-                    gv.draw_edges(zip(p, p[1:]))
-                    gv.draw_vertices(p)
-
-            u, v = next(self.bad_pairs)
-            self.last_bad_pair = u, v
-            for gv in self.graph_views:
-                p = nx.shortest_path(gv.G, u, v)
-                red_pen = QtGui.QPen(QtGui.QColor('red'))
-                gv.draw_edges(zip(p, p[1:]), red_pen, None)
-                gv.draw_vertices(p, red_pen)
-        except:
-            print("out of bad pairs")
-            self.bad_pairs = None
-            self.last_bad_pair = None
-    
-    def set_auto_stretch(self):
-        if not self.calc_stretch:
-            stretch_label = QLabel()
-            stretch_label.setText("stretch: ")
-            stretch_label.setFont(QtGui.QFont('calibry', 12, 1, False))
-            self.buttons.addWidget(stretch_label)
-            if len(self.graph_views) <= 1:
-                return
-            self.calc_stretch = True
-
-            def calc_and_display_strecth_cb(*args):
-                dist = tree_cover_embedding_distortion(self.graph_views[0].G, [gv.G for gv in self.graph_views[1:]])
-                print(dist)
-                stretch_label.setText(f"stretch: {dist}")
-                self.bad_pairs = tree_cover_bad_pairs(self.graph_views[0].G, [gv.G for gv in self.graph_views[1:]], 2)
-                self.bad_pairs = list(self.bad_pairs)
-                print(self.bad_pairs)
-                self.bad_pairs = iter(self.bad_pairs)
-            
-            for gv in self.graph_views:
-                gv.G.register_on_edge_add_callback(calc_and_display_strecth_cb)
-                gv.G.register_on_edge_remove_callback(calc_and_display_strecth_cb)
-
-    def add_graph_view0(self):
-        for gv in self.graph_views:
-            self.graph_views_grid.removeWidget(gv)
-        graph_views_dim = 600, 400
-        w, h = graph_views_dim
-        num_cols = 2
-        row, col = 0, 0
-        self.graph_views = [GraphView(w, h, gv.G, gv.vertex_mapping, gv.mode) for gv in self.graph_views]
-        self.graph_views.append(GraphView(w, h))
-        for gv in self.graph_views:
-            print(row, col)
-            self.graph_views_grid.addWidget(gv, row, col)
-            row += ((col + 1) // num_cols)
-            col = (col + 1) % num_cols
-        self.update()
-    
-    def _add_graph_view(self, graph: ResponsiveGraph, mapping: Dict[Any, Tuple[int, int]]):
-        old_w = self.graph_views_dim[0] // self.num_cols
-        old_h = self.graph_views_dim[1] // self.num_rows
-        ngraph_views = len(self.graph_views) + 1
-        if ngraph_views > self.num_cols * self.num_rows:
-            if self.num_rows == self.num_cols:
-                self.num_cols += 1
-            else:
-                self.num_rows += 1
-        
-        w = self.graph_views_dim[0] // self.num_cols
-        h = self.graph_views_dim[1] // self.num_rows
-        # n = len(self.graph_views)
-        # old_w, old_h = self.graph_views[0].width(), self.graph_views[0].height()
-        # print(old_w, old_h)
-
-        # h, w = old_h // (n + 1), old_w
-
-        for gv in self.graph_views:
-            self.graph_views_grid.removeWidget(gv)
-        
-        self.graph_views.append(GraphView(old_w, old_h, graph, mapping, win_id=self.win_id))
-        
-        for gv in self.graph_views:
-            gv.scale(QSize(w, h))
-        
-        # self.grid.removeWidget(self.gvwidget)
-        
-        # self.gvwidget = QWidget()
-        # self.graph_views_widget = QGridLayout(self.gvwidget)
-
-        # self.graph_views = [
-        #     GraphView(
-        #         w, h, gv.G,
-        #         rescale_origin_mapping(gv.vertex_mapping, old_w, old_h, w, h),
-        #     )
-        #     for gv in self.graph_views
-        # ]
-        
-        
-        row, col = 0, 0
-        for gv in self.graph_views:
-            self.graph_views_grid.addWidget(gv, row, col)
-            gv.draw_graph()
-            row += ((col + 1) // self.num_cols)
-            col = (col + 1) % self.num_cols
-
-        # self.grid.addWidget(self.gvwidget, 0, 0)
-        # self._vbox.removeWidget(self.status)
-        # self.graph_views[-1].stackUnder(self._completion)
-        # self.graph_views[-1].stackUnder(self._messageview)
-        # self._vbox.addWidget(self.graph_views[-1])
-        # self._vbox.addWidget(self.status)
-        
-        # self.restart_overlays()
-        # self._update_overlay_geometries()
-
-    def add_graph_view(self):
-        self._add_graph_view(ResponsiveGraph(), dict())
-    
-    @cmdutils.register(name='duplicate', instance='main-window', scope='window')
-    def duplicate_view(self, gv_id: int = None):
-        """
-        Create another graph view which is identical to the current selected view
-        """
-        if gv_id is None:
-            gv: GraphView = objreg.get('graph-view', scope='window', window=self.win_id)
-            gv_id = gv.gv_id
-        if not isinstance(gv_id, int):
-            gv_id = int(gv_id)
-        try:
-            gv = [gv for gv in self.graph_views if gv.gv_id == gv_id][0]
-        except IndexError:
-            raise ArgumentTypeError(f"there is no graph-view with id {gv_id}")
-        self._add_graph_view(gv.G.copy(), gv.vertex_mapping.copy())
-    
-    @cmdutils.register(name='set-active-graph-view', instance='main-window', scope='window')
-    def set_active_graph_view(self, gv_idx: int):
-        """
-        Sets the current active graph view
-        """
-        if not isinstance(gv_idx, int):
-            gv_idx = int(gv_idx)
-        if len(self.graph_views) <= gv_idx:
-            raise ArgumentTypeError(f"graph-view id must be within range of nummber of graph views: {len(self.graph_views)}")
-        objreg.register('graph-view', self.graph_views[gv_idx], scope='window', window=self.win_id, update=True)

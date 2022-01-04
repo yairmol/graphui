@@ -357,9 +357,13 @@ class Command:
 
     def _get_objreg(self, *, win_id, name, scope):
         """Get an object from the objreg."""
+        canvas_id = None
         if scope == 'global':
             tab_id = None
             win_id = None
+        elif scope == 'canvas':
+            canvas_id = 'current'
+            tab_id = 'current'
         elif scope == 'tab':
             tab_id = 'current'
         elif scope == 'window':
@@ -367,7 +371,7 @@ class Command:
         else:
             raise ValueError("Invalid scope {}!".format(scope))
         return objreg.get(name, scope=scope, window=win_id, tab=tab_id,
-                          from_command=True)
+                          canvas=canvas_id, from_command=True)
 
     def _add_special_arg(self, *, value, param, args, kwargs):
         """Add a special argument value to a function call.

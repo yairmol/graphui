@@ -15,13 +15,13 @@ def calculate_stretch(self: MainWindow):
     calculate the stretch of the first graph in the window with respect to the cover
     that is induced by all other graphs in the window
     """
-    if len(self.graph_views) <= 1:
+    if len(self.canvases) <= 1:
         raise PrerequisitesError("Number of graph view must be more then 1 to calculate stretch")
-    V = set(self.graph_views[0].G.nodes)
-    if not all(V.issubset(gv.G.nodes) for gv in self.graph_views[1:]):
+    V = set(self.canvases[0].G.nodes)
+    if not all(V.issubset(gv.G.nodes) for gv in self.canvases[1:]):
         raise PrerequisitesError("the set of verticies of the first graph must"
                                  "be a subset of the vertices of tje other graphs")
-    sc = StretchCalculator(self.graph_views)
+    sc = StretchCalculator(self.canvases)
     objreg.register('stretch-calculator', sc, scope='window', window=self.win_id)
 
 
